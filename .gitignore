@@ -1,0 +1,6 @@
+node_modules/
+.firebase/
+*-debug.log
+# 服務帳戶金鑰絕對不能進 git
+service-account*.json
+*-firebase-adminsdk-*.json

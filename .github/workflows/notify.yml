@@ -1,0 +1,29 @@
+name: 推播提醒
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # 每 15 分鐘（UTC；GitHub 尖峰時段可能晚幾分鐘）
+  workflow_dispatch:          # 可以在 Actions 頁面手動按 Run workflow 測試
+
+concurrency:
+  group: notifier
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: notifier/package-lock.json
+      - run: npm ci
+        working-directory: notifier
+      - run: node send.js
+        working-directory: notifier
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_URL: ${{ vars.APP_URL }}

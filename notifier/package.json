@@ -1,0 +1,16 @@
+{
+  "name": "grad-planner-notifier",
+  "private": true,
+  "description": "研途手帳推播發送器（GitHub Actions 排程執行）",
+  "main": "send.js",
+  "scripts": {
+    "send": "node send.js",
+    "dry": "node send.js --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0"
+  }
+}

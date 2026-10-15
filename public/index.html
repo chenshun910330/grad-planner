@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>研途手帳</title>
+<meta name="description" content="碩士生的課表、行程、進度與考試提醒">
+<meta name="theme-color" content="#2B59C3">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="研途手帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&display=swap">
+<script src="firebase-config.js"></script>
+<style>
+/* 版面：手機底部分頁列、電腦左側欄；內容是一頁一頁的「手帳頁」，墨水藍為主色，行程類型用語意色 */
+:root{
+  --bg:#F1F3F7; --surface:#FFFFFF; --surface-2:#E9EDF4; --ink:#172033; --muted:#5A6477; --line:#D7DDE7;
+  --accent:#2B59C3; --accent-ink:#FFFFFF; --accent-soft:#E2E9F9;
+  --exam:#C33B30; --report:#A86A12; --due:#7B4CC2; --meet:#17806F; --other:#5A6477; --ok:#2C8650; --warn:#B4541A;
+  --c1:#3D6FD6; --c2:#17806F; --c3:#B4541A; --c4:#7B4CC2; --c5:#C23A6B; --c6:#5F7A12; --c7:#0E7C9C; --c8:#6A5A44;
+  --font-display:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  --font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --radius:14px; --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 16px rgba(20,30,50,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E131D; --surface:#161D2B; --surface-2:#1E2738; --ink:#E5E9F1; --muted:#97A1B5; --line:#283246;
+    --accent:#7FA0FF; --accent-ink:#0E131D; --accent-soft:#20304F;
+    --exam:#FF7B6F; --report:#E8AE52; --due:#B89CFF; --meet:#4CC7B2; --other:#97A1B5; --ok:#5DC98B; --warn:#F09A5E;
+    --c1:#7FA0FF; --c2:#4CC7B2; --c3:#F09A5E; --c4:#B89CFF; --c5:#F27BA6; --c6:#A9C95A; --c7:#5CC6E6; --c8:#C7B394;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E131D; --surface:#161D2B; --surface-2:#1E2738; --ink:#E5E9F1; --muted:#97A1B5; --line:#283246;
+  --accent:#7FA0FF; --accent-ink:#0E131D; --accent-soft:#20304F;
+  --exam:#FF7B6F; --report:#E8AE52; --due:#B89CFF; --meet:#4CC7B2; --other:#97A1B5; --ok:#5DC98B; --warn:#F09A5E;
+  --c1:#7FA0FF; --c2:#4CC7B2; --c3:#F09A5E; --c4:#B89CFF; --c5:#F27BA6; --c6:#A9C95A; --c7:#5CC6E6; --c8:#C7B394;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+h1,h2,h3{margin:0;text-wrap:balance}
+.mono,time,.tnum{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+/* ---------- 外框 ---------- */
+.app{display:grid;grid-template-columns:minmax(0,1fr);min-height:100%}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.brand{display:none}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;
+  color:var(--muted);text-decoration:none;font-size:11px;letter-spacing:.04em}
+.nav a svg{width:22px;height:22px}
+.nav a[aria-current="page"]{color:var(--accent)}
+.nav a[aria-current="page"] svg{stroke-width:2.2}
+main{min-width:0;padding-block:20px calc(92px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.page{max-width:1080px;margin:0 auto;display:grid;gap:18px}
+@media (min-width:900px){
+  .app{grid-template-columns:228px minmax(0,1fr)}
+  .nav{position:sticky;top:0;height:100vh;flex-direction:column;justify-content:flex-start;gap:4px;
+    border-top:none;border-right:1px solid var(--line);padding:24px 14px}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 10px 22px;font:700 19px var(--font-display);letter-spacing:.06em}
+  .brand img{width:30px;height:30px;border-radius:8px}
+  .nav a{flex:none;flex-direction:row;gap:12px;padding:10px 12px;font-size:15px;letter-spacing:.02em}
+  .nav a[aria-current="page"]{background:var(--accent-soft)}
+  main{padding-block:32px 48px}
+}
+
+/* ---------- 共用元件 ---------- */
+.page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.page-head h1{font:700 28px/1.2 var(--font-display);letter-spacing:.04em}
+.eyebrow{margin:0 0 4px;color:var(--muted);font-size:13px;letter-spacing:.08em}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);
+  padding:8px 14px;border-radius:10px;font-size:14px;font-weight:500;line-height:1.3}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--exam);border-color:color-mix(in srgb,var(--exam) 40%,var(--line))}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:8px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.icon-btn{border:1px solid var(--line);background:var(--surface);width:36px;height:36px;border-radius:10px;display:inline-grid;place-items:center}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;min-width:0}
+.panel>h2{font-size:13px;font-weight:700;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.empty{color:var(--muted);font-size:14px;margin:0;display:grid;gap:10px;justify-items:start}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:1px 7px;border-radius:999px;
+  color:var(--tc,var(--muted));background:color-mix(in srgb,var(--tc,var(--muted)) 14%,transparent);white-space:nowrap}
+.t-exam{--tc:var(--exam)} .t-report{--tc:var(--report)} .t-due{--tc:var(--due)} .t-meet{--tc:var(--meet)} .t-other{--tc:var(--other)}
+.t-course{--tc:var(--accent)} .t-step{--tc:var(--ok)} .t-deadline{--tc:var(--warn)}
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:12px;
+  background:var(--accent-soft);color:var(--ink);font-size:13.5px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:50;
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
+@media (min-width:900px){.toast{bottom:28px}}
+
+/* ---------- 議程列（今天、行事曆共用） ---------- */
+.agenda{list-style:none;margin:0;padding:0;display:grid}
+.agenda li+li{border-top:1px dashed var(--line)}
+.row-item{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;
+  text-align:left;background:none;border:none;padding:9px 2px;border-radius:8px}
+.row-item:hover{background:var(--surface-2)}
+.row-item .when{font-size:12.5px;color:var(--muted)}
+.row-item .what{min-width:0}
+.row-item .what b{font-weight:500;display:block;overflow-wrap:anywhere}
+.row-item .what small{color:var(--muted);font-size:12.5px}
+.row-item.is-done .what b{text-decoration:line-through;color:var(--muted)}
+.swatch{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--cc,var(--accent));margin-right:6px;vertical-align:1px}
+.now-chip{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em}
+
+/* ---------- 今天 ---------- */
+.today-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:760px){.today-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+.countdowns{display:grid;gap:10px}
+.cd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;background:none;border:none;text-align:left;padding:4px 0;width:100%}
+.cd .big{font:600 26px/1 var(--font-mono);color:var(--exam);min-width:76px;text-align:right}
+.cd .big small{font-size:13px;margin-left:2px}
+.cd b{font-weight:500;display:block}
+.cd span{color:var(--muted);font-size:13px}
+.day-group+.day-group{margin-top:10px}
+.day-group h3{font-size:12.5px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+.week-chip{font:600 13px var(--font-mono);color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:999px}
+
+/* ---------- 進度條 ---------- */
+.bar{height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:inherit;transition:width .3s}
+.mini-goal{display:grid;gap:6px;background:none;border:none;text-align:left;padding:6px 0;width:100%}
+.mini-goal+.mini-goal{border-top:1px dashed var(--line);padding-top:10px}
+.mini-goal .top{display:flex;justify-content:space-between;gap:8px}
+.mini-goal small{color:var(--muted)}
+
+/* ---------- 行事曆 ---------- */
+.cal-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cal-bar strong{font:600 17px var(--font-mono);min-width:8.5em;text-align:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:none;background:var(--surface);padding:7px 14px;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.month .dow{text-align:center;font-size:12px;color:var(--muted);padding:2px 0;letter-spacing:.1em}
+.month .dow.we{color:var(--exam)}
+.cell{min-height:92px;display:flex;flex-direction:column;gap:3px;align-items:stretch;text-align:left;padding:6px;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0}
+.cell .num{font:500 13px var(--font-mono)}
+.cell.out{background:transparent;border-style:dashed}
+.cell.out .num{color:var(--muted);opacity:.6}
+.cell.today .num{background:var(--accent);color:var(--accent-ink);border-radius:999px;width:24px;height:24px;display:grid;place-items:center;margin:-2px}
+.cell.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.mk{display:block;font-size:11.5px;line-height:1.35;padding:1px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--tc);background:color-mix(in srgb,var(--tc) 13%,transparent)}
+.mk.done{text-decoration:line-through;opacity:.6}
+.more{font-size:11px;color:var(--muted);padding-left:4px}
+@media (max-width:600px){
+  .month{gap:2px}
+  .cell{min-height:54px;padding:4px;align-items:center;border-radius:8px}
+  .cell .marks{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+  .mk{width:6px;height:6px;padding:0;border-radius:50%;font-size:0;background:var(--tc)}
+  .more{display:none}
+}
+.week{display:grid;gap:10px}
+.week .panel h3{font-size:14px;margin-bottom:4px;display:flex;gap:8px;align-items:center}
+.week .panel.is-today{border-color:var(--accent)}
+
+/* ---------- 課表 ---------- */
+.tt-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.tt{display:grid;grid-template-columns:62px repeat(var(--days),minmax(84px,1fr));grid-auto-rows:minmax(52px,auto);min-width:calc(62px + var(--days) * 84px)}
+.tt-h{grid-row:1;text-align:center;font-size:13px;font-weight:700;letter-spacing:.1em;padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted)}
+.tt-h.is-today{color:var(--accent)}
+.tt-slot{grid-column:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);font-family:var(--font-mono);line-height:1.2}
+.tt-slot b{font-size:15px}
+.tt-slot small{font-size:10.5px;color:var(--muted)}
+.tt-cell{border:none;border-bottom:1px solid var(--line);border-left:1px dashed var(--line);background:transparent;color:transparent;font-size:18px}
+.tt-cell:hover,.tt-cell:focus-visible{background:var(--accent-soft);color:var(--accent)}
+.tt-course{z-index:1;margin:3px;border:none;border-left:4px solid var(--cc);border-radius:8px;text-align:left;padding:6px 8px;
+  background:color-mix(in srgb,var(--cc) 16%,var(--surface));display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.tt-course b{font-size:13.5px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.tt-course small{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.hint{color:var(--muted);font-size:13px;margin:0}
+@media (max-width:520px){
+  .tt{grid-template-columns:44px repeat(var(--days),minmax(58px,1fr));min-width:calc(44px + var(--days) * 58px);grid-auto-rows:minmax(48px,auto)}
+  .tt-course{margin:2px;padding:4px 5px;border-left-width:3px}
+  .tt-course b{font-size:12px}
+  .tt-course small{font-size:10.5px}
+  .tt-slot small{font-size:9.5px}
+}
+
+/* ---------- 進度 ---------- */
+.goals{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.goal{display:grid;gap:10px;align-content:start}
+.goal-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.goal-head h3{font-size:17px;overflow-wrap:anywhere}
+.dchip{font:600 12.5px var(--font-mono);white-space:nowrap;color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);padding:2px 8px;border-radius:999px}
+.dchip.late{color:var(--exam);background:color-mix(in srgb,var(--exam) 13%,transparent)}
+.dchip.done{color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,transparent)}
+.goal .meta{margin:0;font-size:13px;color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.steps li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 0}
+.steps label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;min-width:0}
+.steps label span{overflow-wrap:anywhere}
+.steps input{width:18px;height:18px;margin-top:3px;accent-color:var(--ok);flex:none}
+.steps li.done span{text-decoration:line-through;color:var(--muted)}
+.steps time{font-size:12px;color:var(--muted)}
+.steps li.late time{color:var(--exam);font-weight:600}
+
+/* ---------- 設定 ---------- */
+.settings{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start}
+.settings .panel{display:grid;gap:12px}
+.settings p{margin:0}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sc,var(--muted))}
+.status.on{--sc:var(--ok)} .status.off{--sc:var(--warn)}
+.slot-table{display:grid;grid-template-columns:44px 1fr 1fr;gap:6px;align-items:center;max-height:340px;overflow:auto}
+.slot-table b{font-family:var(--font-mono);text-align:center}
+.steps-guide{margin:0;padding-left:20px;display:grid;gap:4px;font-size:14px}
+
+/* ---------- 表單 / 對話框 ---------- */
+dialog{border:none;padding:0;border-radius:18px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow);
+  width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgba(8,12,22,.5)}
+.modal{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+.modal header{padding:18px 20px 6px;display:flex;justify-content:space-between;align-items:center}
+.modal header h2{font:700 19px var(--font-display);letter-spacing:.04em}
+.modal .body{padding:8px 20px 12px;overflow:auto;display:grid;gap:14px}
+.modal footer{padding:12px 20px 18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--line)}
+.modal footer .spacer{flex:1}
+.field{display:grid;gap:5px;font-size:13px;color:var(--muted);min-width:0}
+.field>span{letter-spacing:.04em}
+input:not([type=checkbox]):not([type=radio]),select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{min-height:72px;resize:vertical}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+fieldset{border:none;margin:0;padding:0;display:grid;gap:6px;min-width:0}
+legend{font-size:13px;color:var(--muted);padding:0;margin-bottom:6px;letter-spacing:.04em}
+.choices{display:flex;flex-wrap:wrap;gap:6px}
+.choice{position:relative}
+.choice input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.choice span{display:inline-block;padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13.5px;color:var(--ink);background:var(--surface)}
+.choice input:checked+span{border-color:var(--tc,var(--accent));background:color-mix(in srgb,var(--tc,var(--accent)) 15%,var(--surface));color:var(--tc,var(--accent));font-weight:700}
+.choice input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.colors .choice span{width:30px;height:30px;padding:0;border-radius:50%;background:var(--cc);border:3px solid var(--surface)}
+.colors .choice input:checked+span{box-shadow:0 0 0 2px var(--cc)}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.err{color:var(--exam);font-size:13px;margin:0}
+.step-rows{display:grid;gap:8px}
+.step-row{display:grid;grid-template-columns:auto minmax(0,1fr) 150px auto;gap:6px;align-items:center}
+.step-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--ok)}
+@media (max-width:520px){.step-row{grid-template-columns:auto minmax(0,1fr) auto}.step-row input[type=date]{grid-column:2/3}}
+
+/* ---------- 登入 ---------- */
+.login{min-height:100%;display:grid;place-items:center;padding:32px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
+.login-card{max-width:420px;display:grid;gap:16px;justify-items:start}
+.login-card img{width:64px;height:64px;border-radius:16px}
+.login-card h1{font:700 34px/1.2 var(--font-display);letter-spacing:.06em}
+.login-card p{margin:0;color:var(--muted)}
+.skeleton{color:var(--muted);padding:40px 0;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="root"><p class="skeleton">載入中…</p></div>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="module">
+/* ============================================================
+   研途手帳：課表、行程、進度、推播提醒
+   資料層 BE 有兩種：試用模式（localStorage）與雲端模式（Firebase）
+   ============================================================ */
+const CFG = self.FIREBASE_CONFIG || {};
+const TRIAL = !CFG.apiKey || String(CFG.apiKey).startsWith('PASTE');
+const FB = 'https://www.gstatic.com/firebasejs/10.14.1/';
+const MORNING = '09:00';   // 整天行程與進度步驟的提醒時間
+
+// ---------- 小工具 ----------
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const at = (dateStr, time) => { const d = parseYmd(dateStr); if (time) { const [h, mi] = time.split(':').map(Number); d.setHours(h, mi, 0, 0); } return d; };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const isoDow = d => ((d.getDay() + 6) % 7) + 1;                 // 1=週一 … 7=週日
+const startOfWeek = d => addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), 1 - isoDow(d));
+const dayDiff = (from, to) => Math.round((parseYmd(ymd(to)) - parseYmd(ymd(from))) / 86400000);
+const WD = ['日', '一', '二', '三', '四', '五', '六'];
+const DOW_LABEL = ['', '一', '二', '三', '四', '五', '六', '日'];
+const md = d => `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）`;
+const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+const NTHU_SLOTS = [['1', '08:00', '08:50'], ['2', '09:00', '09:50'], ['3', '10:10', '11:00'], ['4', '11:10', '12:00'],
+  ['n', '12:10', '13:00'], ['5', '13:20', '14:10'], ['6', '14:20', '15:10'], ['7', '15:30', '16:20'], ['8', '16:30', '17:20'],
+  ['9', '17:30', '18:20'], ['a', '18:30', '19:20'], ['b', '19:30', '20:20'], ['c', '20:30', '21:20']]
+  .map(([code, start, end]) => ({ code, start, end }));
+
+const TYPES = {
+  exam: { label: '考試', rem: [1440, 60] },
+  report: { label: '報告', rem: [1440, 180] },
+  due: { label: '作業截止', rem: [1440, 180] },
+  meet: { label: 'Meeting', rem: [60] },
+  other: { label: '其他', rem: [60] },
+};
+const REM_OPTS = [[10080, '1 週前'], [4320, '3 天前'], [1440, '1 天前'], [180, '3 小時前'], [60, '1 小時前'], [30, '30 分鐘前'], [10, '10 分鐘前'], [0, '開始時']];
+const COLORS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8'];
+const DEFAULT_PROFILE = { slots: NTHU_SLOTS, showWeekend: false, classReminder: false, classLead: 10, semesterStart: '', semesterEnd: '' };
+
+const S = {
+  user: null, ready: false, events: [], courses: [], goals: [], profile: { ...DEFAULT_PROFILE },
+  view: 'today', calMode: 'month', cursor: today0(), sel: today0(), push: 'unknown',
+};
+
+const ICONS = {
+  today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
+  timetable: '<rect x="3" y="3.5" width="18" height="17" rx="2.5"/><path d="M3 9h18M3 14.5h18M9 3.5v17M15 3.5v17"/>',
+  goals: '<path d="M4 20V4M4 5h12l-2 3.5L16 12H4"/><path d="M14 20h6"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+};
+const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+const VIEWS = [['today', '今天'], ['calendar', '行事曆'], ['timetable', '課表'], ['goals', '進度'], ['settings', '設定']];
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
+}
+const fail = e => { console.error(e); toast('儲存失敗：' + (e?.message || e) + '，請檢查網路後再試一次'); };
+
+// ---------- 資料層：試用模式 ----------
+function sampleData() {
+  const t = today0(), d = n => ymd(addDays(t, n));
+  const C = (name, day, s, e, room, teacher, color) => ({ name, day, startSlot: s, endSlot: e, room, teacher, color, sample: true });
+  const courses = [C('機器學習', 2, '3', '4', '資電 132', '王老師', 'c1'), C('機器學習', 4, '3', '3', '資電 132', '王老師', 'c1'),
+    C('演算法設計', 1, '6', '8', '台達 105', '陳老師', 'c3'), C('書報討論', 3, '7', '8', '資電 233', '林老師', 'c2'),
+    C('統計學習理論', 5, '2', '3', '綜二 201', '張老師', 'c4')];
+  const E = (title, type, date, startTime, endTime, location, reminders) =>
+    ({ title, type, date, allDay: !startTime, startTime: startTime || '', endTime: endTime || '', location, note: '', reminders, sample: true });
+  const events = [E('機器學習期中考', 'exam', d(5), '10:10', '12:00', '資電 132', [1440, 60]),
+    E('和指導教授 meeting', 'meet', d(2), '15:00', '16:00', '研究室', [60]),
+    E('演算法 HW3 截止', 'due', d(3), '23:59', '', 'eeclass', [1440, 180]),
+    E('書報討論上台報告', 'report', d(9), '15:30', '17:20', '資電 233', [1440, 180])];
+  const goals = [{ title: '碩論第二章：文獻回顧', deadline: d(30), note: '', sample: true, steps: [
+    { title: '整理 20 篇相關論文清單', due: d(-3), done: true }, { title: '讀完核心 5 篇並寫摘要', due: d(6), done: false },
+    { title: '畫方法比較表', due: d(14), done: false }, { title: '寫完初稿給老師看', due: d(26), done: false }] }];
+  const toMap = arr => Object.fromEntries(arr.map(x => [rid(), x]));
+  return { events: toMap(events), courses: toMap(courses), goals: toMap(goals), profile: { ...DEFAULT_PROFILE }, reminders: [] };
+}
+function makeLocal() {
+  const KEY = 'grad-planner-trial-v1';
+  let db = null;
+  try { db = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { }
+  if (!db) db = sampleData();
+  const subs = {};
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { } };
+  const emit = col => (subs[col] || []).forEach(cb => cb(col === 'profile' ? { ...db.profile } : Object.entries(db[col]).map(([id, v]) => ({ id, ...v }))));
+  // 試用模式只能在 app 開著時跳通知
+  setInterval(() => {
+    const now = Date.now(); let changed = false;
+    for (const r of db.reminders) if (!r.sent && r.fireAt <= now) {
+      r.sent = true; changed = true;
+      if (now < r.eventAt) showLocalNotification(r.title, r.body);
+    }
+    if (changed) persist();
+  }, 30000);
+  return {
+    mode: 'trial',
+    onUser(cb) { cb({ uid: 'trial', email: '試用模式（資料只在這台裝置）' }); },
+    async signIn() { }, async signOut() { },
+    watch(col, cb) { (subs[col] ??= []).push(cb); emit(col); },
+    newId: () => rid(),
+    async save(col, id, data) { db[col][id] = data; persist(); emit(col); },
+    async remove(col, id) { delete db[col][id]; persist(); emit(col); },
+    async saveProfile(p) { db.profile = { ...db.profile, ...p }; persist(); emit('profile'); },
+    async replaceReminders(ref, list) { db.reminders = db.reminders.filter(r => r.ref !== ref).concat(list.map(r => ({ ...r, ref, sent: false }))); persist(); },
+    async saveToken() { },
+    clearAll() { db = { events: {}, courses: {}, goals: {}, profile: { ...DEFAULT_PROFILE }, reminders: [] }; persist(); ['events', 'courses', 'goals', 'profile'].forEach(emit); },
+  };
+}
+
+// ---------- 資料層：Firebase ----------
+async function makeFirebase() {
+  const [{ initializeApp }, A, F] = await Promise.all([
+    import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')]);
+  const app = initializeApp(CFG);
+  const auth = A.getAuth(app);
+  let db;
+  try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+  catch { db = F.getFirestore(app); }
+  if (self.USE_EMULATORS) {
+    A.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    F.connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  }
+  let uid = null; const unsubs = [];
+  return {
+    mode: 'cloud', app,
+    onUser(cb) { A.onAuthStateChanged(auth, u => { unsubs.splice(0).forEach(f => f()); uid = u?.uid || null; cb(u); }); },
+    async signIn() {
+      const p = new A.GoogleAuthProvider();
+      try { await A.signInWithPopup(auth, p); }
+      catch (e) {
+        if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(e.code)) await A.signInWithRedirect(auth, p);
+        else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') throw e;
+      }
+    },
+    signOut: () => A.signOut(auth),
+    watch(col, cb) {
+      const onErr = e => { console.error(e); toast('讀取資料失敗：' + e.message); };
+      if (col === 'profile') unsubs.push(F.onSnapshot(F.doc(db, 'users', uid), s => cb(s.data() || {}), onErr));
+      else unsubs.push(F.onSnapshot(F.collection(db, 'users', uid, col), qs => cb(qs.docs.map(d => ({ id: d.id, ...d.data() }))), onErr));
+    },
+    newId: col => F.doc(F.collection(db, 'users', uid, col)).id,
+    save: (col, id, data) => F.setDoc(F.doc(db, 'users', uid, col, id), data),
+    remove: (col, id) => F.deleteDoc(F.doc(db, 'users', uid, col, id)),
+    saveProfile: p => F.setDoc(F.doc(db, 'users', uid), p, { merge: true }),
+    async replaceReminders(ref, list) {
+      const qs = await F.getDocs(F.query(F.collection(db, 'reminders'), F.where('uid', '==', uid), F.where('ref', '==', ref)));
+      const b = F.writeBatch(db);
+      qs.forEach(d => b.delete(d.ref));
+      list.forEach(r => b.set(F.doc(F.collection(db, 'reminders')), { ...r, uid, ref, sent: false, createdAt: Date.now() }));
+      await b.commit();
+    },
+    saveToken: token => F.setDoc(F.doc(db, 'users', uid, 'tokens', token), { token, ua: navigator.userAgent.slice(0, 180), updatedAt: Date.now() }),
+  };
+}
+
+// ---------- 提醒計算 ----------
+function leadText(m, allDay) {
+  if (allDay) return m === 0 ? '就是今天' : m < 1440 ? '就是今天' : m === 1440 ? '明天' : `${Math.round(m / 1440)} 天後`;
+  if (m === 0) return '現在開始';
+  if (m < 60) return `${m} 分鐘後開始`;
+  if (m < 1440) return `${Math.round(m / 60)} 小時後開始`;
+  return m === 1440 ? '明天這個時間' : `${Math.round(m / 1440)} 天後`;
+}
+function eventReminders(e) {
+  const now = Date.now();
+  const start = at(e.date, e.allDay ? MORNING : e.startTime);
+  const eventAt = e.allDay ? at(e.date, '23:59').getTime() : start.getTime();
+  const when = `${md(start)}${e.allDay ? ' 整天' : ' ' + e.startTime}${e.location ? '・' + e.location : ''}`;
+  return [...new Set(e.reminders || [])].map(m => {
+    const fire = e.allDay ? at(ymd(addDays(start, -Math.floor(m / 1440))), MORNING).getTime() : start.getTime() - m * 60000;
+    return { fireAt: fire, eventAt, title: `${TYPES[e.type]?.label || '行程'}｜${e.title}`, body: `${leadText(m, e.allDay)}・${when}` };
+  }).filter(r => r.fireAt > now);
+}
+function goalReminders(g) {
+  const now = Date.now(), out = [];
+  for (const s of g.steps || []) if (!s.done && s.due) {
+    out.push({ fireAt: at(s.due, MORNING).getTime(), eventAt: at(s.due, '23:59').getTime(), title: `進度｜${g.title}`, body: `今天預定完成：${s.title}` });
+  }
+  if (g.deadline) {
+    const end = at(g.deadline, '23:59').getTime();
+    out.push({ fireAt: at(ymd(addDays(parseYmd(g.deadline), -1)), MORNING).getTime(), eventAt: end, title: `明天截止｜${g.title}`, body: '打開研途手帳看看還有哪些步驟沒完成' });
+    out.push({ fireAt: at(g.deadline, MORNING).getTime(), eventAt: end, title: `今天截止｜${g.title}`, body: '今天是這個目標的截止日' });
+  }
+  return out.filter(r => r.fireAt > now);
+}
+
+// ---------- 衍生資料 ----------
+const slots = () => S.profile.slots?.length ? S.profile.slots : NTHU_SLOTS;
+const slotIdx = code => slots().findIndex(s => s.code === code);
+const slotOf = code => slots()[slotIdx(code)];
+const pct = g => { const n = g.steps?.length || 0; return n ? Math.round(g.steps.filter(s => s.done).length / n * 100) : 0; };
+function inSemester(d) {
+  const k = ymd(d), p = S.profile;
+  return !(p.semesterStart && k < p.semesterStart) && !(p.semesterEnd && k > p.semesterEnd);
+}
+function weekNo(d = today0()) {
+  if (!S.profile.semesterStart || !inSemester(d)) return null;
+  return Math.floor(dayDiff(parseYmd(S.profile.semesterStart), d) / 7) + 1;
+}
+function itemsOn(d, { courses = true } = {}) {
+  const key = ymd(d), dow = isoDow(d), out = [];
+  if (courses && inSemester(d)) for (const c of S.courses) if (c.day === dow) {
+    const a = slotOf(c.startSlot), b = slotOf(c.endSlot);
+    if (a && b) out.push({ kind: 'course', sort: a.start, start: a.start, end: b.end, time: `${a.start}–${b.end}`, title: c.name,
+      sub: [`第 ${c.startSlot === c.endSlot ? c.startSlot : c.startSlot + '–' + c.endSlot} 節`, c.room].filter(Boolean).join('・'), color: c.color, id: c.id });
+  }
+  for (const e of S.events) if (e.date === key) out.push({ kind: 'event', sort: e.allDay ? '00:00' : e.startTime,
+    time: e.allDay ? '整天' : e.startTime + (e.endTime ? '–' + e.endTime : ''), title: e.title, sub: e.location, type: e.type, id: e.id });
+  for (const g of S.goals) {
+    if (g.deadline === key) out.push({ kind: 'deadline', sort: '00:01', time: '目標截止', title: g.title, sub: `進度 ${pct(g)}%`, id: g.id });
+    (g.steps || []).forEach((s, i) => { if (s.due === key) out.push({ kind: 'step', sort: '00:02', time: s.done ? '已完成' : '進度步驟', title: s.title, sub: g.title, done: s.done, id: g.id, i }); });
+  }
+  return out.sort((a, b) => a.sort.localeCompare(b.sort));
+}
+const kindClass = it => it.kind === 'event' ? 't-' + (it.type || 'other') : 't-' + it.kind;
+const kindLabel = it => it.kind === 'event' ? TYPES[it.type]?.label || '其他' : { course: '課程', step: '進度', deadline: '截止' }[it.kind];
+const sampleTag = x => x?.sample ? ' <span class="tag">範例</span>' : '';
+
+function rowItem(it, extra = '') {
+  const act = { course: 'edit-course', event: 'edit-event', step: 'edit-goal', deadline: 'edit-goal' }[it.kind];
+  const sw = it.kind === 'course' ? `<span class="swatch" style="--cc:var(--${it.color || 'c1'})"></span>` : '';
+  return `<li><button class="row-item ${it.done ? 'is-done' : ''}" data-act="${act}" data-id="${esc(it.id)}">
+    <span class="when mono">${esc(it.time)}</span>
+    <span class="what"><b>${sw}${esc(it.title)}</b>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</span>
+    <span>${extra || `<span class="tag ${kindClass(it)}">${esc(kindLabel(it))}</span>`}</span></button></li>`;
+}
+
+// ---------- 畫面：今天 ----------
+function viewToday() {
+  const t = today0(), now = new Date(), nowHM = hm(now), wk = weekNo();
+  const classes = itemsOn(t).filter(i => i.kind === 'course');
+  const nextIdx = classes.findIndex(c => c.end > nowHM);
+  const classList = !S.courses.length
+    ? `<div class="empty"><span>還沒有課表。填好之後，每天的課會列在這裡。</span><a class="btn" href="#timetable">去填課表</a></div>`
+    : !inSemester(t) ? `<p class="empty">今天不在學期範圍內。</p>`
+    : classes.length ? `<ul class="agenda">${classes.map((c, i) => rowItem(c, i === nextIdx ? `<span class="now-chip">${c.start <= nowHM ? '上課中' : '下一堂'}</span>` : '')).join('')}</ul>`
+    : `<p class="empty">今天沒有課。</p>`;
+
+  const exams = S.events.filter(e => e.type === 'exam' && e.date >= ymd(t)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)).slice(0, 4);
+  const examList = exams.length ? `<div class="countdowns">${exams.map(e => {
+    const n = dayDiff(t, parseYmd(e.date));
+    return `<button class="cd" data-act="edit-event" data-id="${e.id}"><span class="big">${n === 0 ? '今天' : `D-${n}`}</span>
+      <span><b>${esc(e.title)}${sampleTag(e)}</b><span>${md(parseYmd(e.date))}${e.allDay ? '' : ' ' + e.startTime}${e.location ? '・' + esc(e.location) : ''}</span></span></button>`;
+  }).join('')}</div>` : `<div class="empty"><span>近期沒有考試。新增行程時類型選「考試」，就會出現倒數。</span></div>`;
+
+  let upcoming = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(t, i), items = itemsOn(d, { courses: false }).filter(x => !x.done);
+    if (items.length) upcoming += `<div class="day-group"><h3>${i === 0 ? '今天' : i === 1 ? '明天' : ''} ${md(d)}</h3><ul class="agenda">${items.map(x => rowItem(x)).join('')}</ul></div>`;
+  }
+  if (!upcoming) upcoming = `<div class="empty"><span>接下來 7 天沒有行程。</span><button class="btn" data-act="new-event">新增行程</button></div>`;
+
+  const goals = S.goals.filter(g => pct(g) < 100).sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
+  const goalList = goals.length ? goals.map(g => {
+    const next = (g.steps || []).filter(s => !s.done).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
+    return `<button class="mini-goal" data-act="edit-goal" data-id="${g.id}"><span class="top"><b>${esc(g.title)}</b><span class="mono">${pct(g)}%</span></span>
+      <span class="bar"><i style="width:${pct(g)}%"></i></span>
+      <small>${next ? `下一步：${esc(next.title)}${next.due ? `（${md(parseYmd(next.due))}）` : ''}` : '還沒有步驟'}</small></button>`;
+  }).join('') : `<div class="empty"><span>把論文、作業或期中準備拆成小步驟，進度會顯示在這裡。</span><a class="btn" href="#goals">建立第一個目標</a></div>`;
+
+  return `<div class="page">
+    <header class="page-head"><div><p class="eyebrow mono">${t.getFullYear()} 年 ${t.getMonth() + 1} 月 ${t.getDate()} 日・星期${WD[t.getDay()]}</p><h1>今天</h1></div>
+      <div class="actions">${wk ? `<span class="week-chip">第 ${wk} 週</span>` : ''}<button class="btn primary" data-act="new-event">＋ 新增行程</button></div></header>
+    ${trialBanner()}
+    <div class="today-grid">
+      <section class="panel"><h2>今日課程</h2>${classList}</section>
+      <section class="panel"><h2>考試倒數</h2>${examList}</section>
+      <section class="panel"><h2>接下來 7 天</h2>${upcoming}</section>
+      <section class="panel"><h2>進度</h2>${goalList}</section>
+    </div></div>`;
+}
+
+// ---------- 畫面：行事曆 ----------
+function viewCalendar() {
+  const c = S.cursor, t = ymd(today0());
+  let title, body;
+  if (S.calMode === 'month') {
+    title = `${c.getFullYear()} 年 ${c.getMonth() + 1} 月`;
+    const first = new Date(c.getFullYear(), c.getMonth(), 1), start = startOfWeek(first);
+    const last = new Date(c.getFullYear(), c.getMonth() + 1, 0), weeks = Math.ceil((dayDiff(start, last) + 1) / 7);
+    let cells = DOW_LABEL.slice(1).map((w, i) => `<div class="dow ${i > 4 ? 'we' : ''}">${w}</div>`).join('');
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = addDays(start, i), k = ymd(d), items = itemsOn(d, { courses: false });
+      cells += `<button class="cell ${d.getMonth() !== c.getMonth() ? 'out' : ''} ${k === t ? 'today' : ''} ${k === ymd(S.sel) ? 'sel' : ''}" data-act="cal-pick" data-date="${k}" aria-label="${md(d)}，${items.length} 個項目">
+        <span class="num">${d.getDate()}</span><span class="marks">${items.slice(0, 3).map(x => `<span class="mk ${kindClass(x)} ${x.done ? 'done' : ''}">${esc(x.title)}</span>`).join('')}${items.length > 3 ? `<span class="more">+${items.length - 3}</span>` : ''}</span></button>`;
+    }
+    const sel = S.sel, selItems = itemsOn(sel);
+    body = `<div class="month">${cells}</div>
+      <section class="panel"><h2><span>${md(sel)}${weekNo(sel) ? `・第 ${weekNo(sel)} 週` : ''}</span><button class="btn ghost" data-act="new-event" data-date="${ymd(sel)}">＋ 這天新增</button></h2>
+      ${selItems.length ? `<ul class="agenda">${selItems.map(x => rowItem(x)).join('')}</ul>` : '<p class="empty">這天沒有安排。</p>'}</section>`;
+  } else {
+    const ws = startOfWeek(c), we = addDays(ws, 6);
+    title = `${ws.getMonth() + 1}/${ws.getDate()} – ${we.getMonth() + 1}/${we.getDate()}`;
+    body = `<div class="week">${[0, 1, 2, 3, 4, 5, 6].map(i => {
+      const d = addDays(ws, i), items = itemsOn(d);
+      return `<section class="panel ${ymd(d) === t ? 'is-today' : ''}"><h3><span>${md(d)}</span>${ymd(d) === t ? '<span class="tag t-course">今天</span>' : ''}</h3>
+        ${items.length ? `<ul class="agenda">${items.map(x => rowItem(x)).join('')}</ul>` : `<p class="empty">沒有安排</p>`}</section>`;
+    }).join('')}</div>`;
+  }
+  return `<div class="page">
+    <header class="page-head"><h1>行事曆</h1><button class="btn primary" data-act="new-event" data-date="${ymd(S.sel)}">＋ 新增行程</button></header>
+    ${trialBanner()}
+    <div class="cal-bar"><button class="icon-btn" data-act="cal-prev" aria-label="上一個">‹</button><strong>${title}</strong>
+      <button class="icon-btn" data-act="cal-next" aria-label="下一個">›</button><button class="btn" data-act="cal-today">今天</button>
+      <span class="seg" role="group" aria-label="檢視"><button data-act="cal-mode" data-mode="month" aria-pressed="${S.calMode === 'month'}">月</button><button data-act="cal-mode" data-mode="week" aria-pressed="${S.calMode === 'week'}">週</button></span></div>
+    ${body}</div>`;
+}
+
+// ---------- 畫面：課表 ----------
+function viewTimetable() {
+  const sl = slots(), days = S.profile.showWeekend || S.courses.some(c => c.day > 5) ? 7 : 5, todayDow = isoDow(new Date());
+  let g = `<div class="tt-h" style="grid-column:1"></div>`;
+  for (let d = 1; d <= days; d++) g += `<div class="tt-h ${d === todayDow ? 'is-today' : ''}" style="grid-column:${d + 1}">${DOW_LABEL[d]}</div>`;
+  sl.forEach((s, i) => {
+    g += `<div class="tt-slot" style="grid-row:${i + 2}"><b>${esc(s.code)}</b><small>${s.start}</small></div>`;
+    for (let d = 1; d <= days; d++) g += `<button class="tt-cell" style="grid-row:${i + 2};grid-column:${d + 1}" data-act="new-course" data-day="${d}" data-slot="${esc(s.code)}" aria-label="星期${DOW_LABEL[d]}第 ${esc(s.code)} 節新增課程">＋</button>`;
+  });
+  for (const c of S.courses) {
+    const a = slotIdx(c.startSlot), b = slotIdx(c.endSlot);
+    if (a < 0 || b < 0 || c.day > days) continue;
+    g += `<button class="tt-course" style="grid-row:${a + 2}/${b + 3};grid-column:${c.day + 1};--cc:var(--${c.color || 'c1'})" data-act="edit-course" data-id="${c.id}">
+      <b>${esc(c.name)}</b>${c.room ? `<small>${esc(c.room)}</small>` : ''}${c.teacher ? `<small>${esc(c.teacher)}</small>` : ''}</button>`;
+  }
+  return `<div class="page">
+    <header class="page-head"><h1>課表</h1><button class="btn primary" data-act="new-course" data-day="1" data-slot="${esc(sl[0]?.code || '1')}">＋ 新增課程</button></header>
+    ${trialBanner()}
+    <div class="tt-wrap"><div class="tt" style="--days:${days}">${g}</div></div>
+    <p class="hint">點空白格子就能在那個時段加課。同一門課一週上兩次就加兩筆，輸入課名時會自動帶入之前填過的教室、老師和顏色。節次時間、學期起訖和週末顯示在「設定」調整。</p></div>`;
+}
+
+// ---------- 畫面：進度 ----------
+function viewGoals() {
+  const t = ymd(today0());
+  const list = [...S.goals].sort((a, b) => (pct(a) === 100) - (pct(b) === 100) || (a.deadline || '9').localeCompare(b.deadline || '9'));
+  const cards = list.map(g => {
+    const p = pct(g), n = g.steps?.length || 0, done = (g.steps || []).filter(s => s.done).length;
+    const dd = g.deadline ? dayDiff(today0(), parseYmd(g.deadline)) : null;
+    const chip = p === 100 && n ? '<span class="dchip done">完成</span>' : dd === null ? '' :
+      `<span class="dchip ${dd < 0 ? 'late' : ''}">${dd < 0 ? `逾期 ${-dd} 天` : dd === 0 ? '今天截止' : `D-${dd}`}・${md(parseYmd(g.deadline))}</span>`;
+    const steps = (g.steps || []).map((s, i) => ({ ...s, i })).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
+    return `<article class="panel goal"><div class="goal-head"><h3>${esc(g.title)}${sampleTag(g)}</h3>${chip}</div>
+      <div class="bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p}%"></i></div>
+      <p class="meta tnum">${done} / ${n} 個步驟・${p}%</p>
+      ${n ? `<ul class="steps">${steps.map(s => `<li class="${s.done ? 'done' : ''} ${!s.done && s.due && s.due < t ? 'late' : ''}">
+        <label><input type="checkbox" data-act="toggle-step" data-id="${g.id}" data-i="${s.i}" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label>
+        <time>${s.due ? md(parseYmd(s.due)) : ''}</time></li>`).join('')}</ul>` : '<p class="empty">還沒有步驟，按「編輯」加入。</p>'}
+      <div><button class="btn" data-act="edit-goal" data-id="${g.id}">編輯</button></div></article>`;
+  }).join('');
+  return `<div class="page">
+    <header class="page-head"><h1>進度</h1><button class="btn primary" data-act="new-goal">＋ 新目標</button></header>
+    ${trialBanner()}
+    ${cards ? `<div class="goals">${cards}</div>` : `<section class="panel"><div class="empty"><span>目標可以是碩論的一章、一份期末報告或期中考準備。設好截止日後把它拆成步驟，可以按「依截止日平均排日期」自動分配，每個步驟當天早上 9 點會提醒你。</span><button class="btn primary" data-act="new-goal">建立第一個目標</button></div></section>`}
+  </div>`;
+}
+
+// ---------- 畫面：設定 ----------
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function pushStatus() {
+  if (BE.mode === 'trial') return ['off', '試用模式：只有 app 開著時才會跳通知'];
+  if (isIOS && !isStandalone) return ['off', 'iPhone 要先「加入主畫面」，從主畫面開啟後才能開通知'];
+  if (!('Notification' in window)) return ['off', '這個瀏覽器不支援通知'];
+  if (Notification.permission === 'denied') return ['off', '通知被封鎖了，要到瀏覽器的網站設定裡改成允許'];
+  if (S.push === 'on') return ['on', '這台裝置已開啟推播'];
+  if (Notification.permission === 'granted') return ['off', '已允許通知，正在註冊推播…'];
+  return ['off', '這台裝置還沒開啟通知'];
+}
+function viewSettings() {
+  const p = S.profile, [st, stText] = pushStatus();
+  const slotRows = slots().map((s, i) => `<b>${esc(s.code)}</b><input type="time" id="slot-s-${i}" value="${s.start}" aria-label="第 ${esc(s.code)} 節開始"><input type="time" id="slot-e-${i}" value="${s.end}" aria-label="第 ${esc(s.code)} 節結束">`).join('');
+  return `<div class="page">
+    <header class="page-head"><h1>設定</h1></header>
+    ${trialBanner()}
+    <div class="settings">
+      <section class="panel"><h2>通知</h2>
+        <span class="status ${st}">${stText}</span>
+        <p class="hint">每支手機、每台電腦都要各自按一次「開啟通知」。提醒由排程每 15 分鐘檢查一次，可能會晚幾分鐘送達。</p>
+        <div class="actions"><button class="btn primary" data-act="push-enable" ${st === 'on' ? 'disabled' : ''}>開啟這台裝置的通知</button>
+          <button class="btn" data-act="push-test-local">測試跳通知</button>
+          ${BE.mode === 'cloud' ? '<button class="btn" data-act="push-test-remote">排一則測試推播</button>' : ''}</div>
+        ${isIOS ? `<p class="hint">iPhone 開通知的步驟：</p><ol class="steps-guide"><li>用 Safari 打開這個網址</li><li>按下方「分享」→「加入主畫面」</li><li>從主畫面的「研途手帳」圖示開啟</li><li>到設定按「開啟這台裝置的通知」→ 允許</li></ol>` : ''}
+      </section>
+      <section class="panel"><h2>上課提醒</h2>
+        <label class="switch"><input type="checkbox" id="set-classrem" ${p.classReminder ? 'checked' : ''}> 每堂課開始前推播提醒</label>
+        <label class="field"><span>提前多久</span><select id="set-classlead">${[10, 15, 20, 30].map(m => `<option value="${m}" ${p.classLead === m ? 'selected' : ''}>${m} 分鐘</option>`).join('')}</select></label>
+      </section>
+      <section class="panel"><h2>學期</h2>
+        <p class="hint">設定後，今天頁會顯示第幾週，學期以外的日子不顯示課程。</p>
+        <div class="two"><label class="field"><span>開學日</span><input type="date" id="set-sem-s" value="${p.semesterStart || ''}"></label>
+          <label class="field"><span>學期結束</span><input type="date" id="set-sem-e" value="${p.semesterEnd || ''}"></label></div>
+        <label class="switch"><input type="checkbox" id="set-weekend" ${p.showWeekend ? 'checked' : ''}> 課表顯示週六、週日</label>
+        <div><button class="btn primary" data-act="save-semester">儲存</button></div>
+      </section>
+      <section class="panel"><h2>節次時間<button class="btn ghost" data-act="slots-reset">恢復清大預設</button></h2>
+        <div class="slot-table">${slotRows}</div>
+        <div><button class="btn primary" data-act="slots-save">儲存節次時間</button></div>
+      </section>
+      <section class="panel"><h2>帳號</h2>
+        <p>${esc(S.user?.email || '')}</p>
+        <div class="actions">${BE.mode === 'cloud' ? '<button class="btn" data-act="signout">登出</button>' : '<button class="btn danger" data-act="trial-clear">清空試用資料</button>'}</div>
+      </section>
+    </div></div>`;
+}
+function trialBanner() {
+  if (BE.mode !== 'trial') return '';
+  return `<div class="banner"><span>試用模式：還沒接上 Firebase，資料只存在這台裝置，也不會推播。標有「範例」的是示範資料。</span>${S.view !== 'settings' ? '<a class="btn" href="#settings">清空範例</a>' : ''}</div>`;
+}
+
+// ---------- 主繪製 ----------
+let BE;
+const root = $('#root');
+function render() {
+  if (!S.user) {
+    root.innerHTML = `<div class="login"><div class="login-card"><img src="icons/icon-192.png" alt="">
+      <h1>研途手帳</h1><p>課表、考試、meeting 和論文進度放在同一本手帳，時間到了推播提醒你。</p>
+      <button class="btn primary" data-act="signin">用 Google 帳號登入</button>
+      <p class="hint">資料存在你的 Firebase 專案，只有登入的帳號本人讀得到。</p></div></div>`;
+    return;
+  }
+  const v = { today: viewToday, calendar: viewCalendar, timetable: viewTimetable, goals: viewGoals, settings: viewSettings }[S.view] || viewToday;
+  const y = scrollY;
+  root.innerHTML = `<div class="app"><nav class="nav" aria-label="主選單"><div class="brand"><img src="icons/icon-192.png" alt="">研途手帳</div>
+    ${VIEWS.map(([k, label]) => `<a href="#${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${label}</span></a>`).join('')}</nav>
+    <main>${S.ready ? v() : '<p class="skeleton">讀取你的資料…</p>'}</main></div>`;
+  scrollTo(0, y);
+}
+function route() {
+  const h = location.hash.slice(1);
+  const next = VIEWS.some(([k]) => k === h) ? h : 'today';
+  const changed = next !== S.view; S.view = next;
+  if (!BE) return;
+  render(); if (changed) scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+
+// ---------- 對話框 ----------
+const dlg = $('#dlg');
+function openModal({ title, body, onSubmit, onDelete, onMount, submitLabel = '儲存' }) {
+  dlg.innerHTML = `<form class="modal" novalidate><header><h2>${title}</h2><button type="button" class="icon-btn" data-close aria-label="關閉">✕</button></header>
+    <div class="body">${body}<p class="err" id="m-err" hidden></p></div>
+    <footer>${onDelete ? '<button type="button" class="btn danger" data-del>刪除</button>' : ''}<span class="spacer"></span>
+      <button type="button" class="btn" data-close>取消</button><button type="submit" class="btn primary">${submitLabel}</button></footer></form>`;
+  const form = $('form', dlg), err = $('#m-err', dlg);
+  const showErr = m => { err.textContent = m; err.hidden = false; };
+  $$('[data-close]', dlg).forEach(b => b.onclick = () => dlg.close());
+  const del = $('[data-del]', dlg);
+  if (del) del.onclick = () => {
+    if (del.dataset.armed) { onDelete(); dlg.close(); }
+    else { del.dataset.armed = '1'; del.textContent = '再按一次確定刪除'; }
+  };
+  form.onsubmit = ev => {
+    ev.preventDefault();
+    const res = onSubmit(form, showErr);
+    if (res !== false) dlg.close();
+  };
+  onMount?.(form);
+  dlg.showModal();
+  setTimeout(() => $('input:not([type=hidden]):not([type=checkbox]):not([type=radio])', dlg)?.focus(), 30);
+}
+
+// 行程
+function openEvent(ev, presetDate) {
+  const e = ev || { title: '', type: 'exam', date: presetDate || ymd(S.sel || today0()), allDay: false, startTime: '10:10', endTime: '12:00', location: '', note: '', reminders: TYPES.exam.rem };
+  openModal({
+    title: ev ? '編輯行程' : '新增行程',
+    body: `<label class="field"><span>標題</span><input id="ev-title" name="etitle" required value="${esc(e.title)}" placeholder="例如：計算機結構期中考"></label>
+      <fieldset><legend>類型</legend><div class="choices">${Object.entries(TYPES).map(([k, v]) =>
+        `<label class="choice t-${k}"><input type="radio" name="type" value="${k}" ${e.type === k ? 'checked' : ''}><span>${v.label}</span></label>`).join('')}</div></fieldset>
+      <div class="two"><label class="field"><span>日期</span><input type="date" id="ev-date" name="date" required value="${e.date}"></label>
+        <label class="switch" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="ev-allday" name="allDay" ${e.allDay ? 'checked' : ''}> 整天</label></div>
+      <div class="two" id="ev-times" ${e.allDay ? 'hidden' : ''}><label class="field"><span>開始</span><input type="time" id="ev-start" name="startTime" value="${e.startTime}"></label>
+        <label class="field"><span>結束（可空白）</span><input type="time" id="ev-end" name="endTime" value="${e.endTime}"></label></div>
+      <label class="field"><span>地點</span><input id="ev-loc" name="location" value="${esc(e.location)}" placeholder="教室、會議室或線上連結"></label>
+      <fieldset><legend>提醒（整天行程在當天或前幾天早上 9 點提醒）</legend><div class="choices">${REM_OPTS.map(([m, l]) =>
+        `<label class="choice"><input type="checkbox" name="rem" value="${m}" ${(e.reminders || []).includes(m) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></fieldset>
+      <label class="field"><span>備註</span><textarea id="ev-note" name="note" placeholder="考試範圍、要帶的東西…">${esc(e.note)}</textarea></label>`,
+    onMount(f) {
+      let touched = !!ev;
+      $$('[name=rem]', f).forEach(c => c.addEventListener('change', () => (touched = true)));
+      $$('[name=type]', f).forEach(r => r.addEventListener('change', () => {
+        if (touched) return;
+        const rem = TYPES[r.value].rem; $$('[name=rem]', f).forEach(c => (c.checked = rem.includes(+c.value)));
+      }));
+      $('#ev-allday', f).addEventListener('change', x => ($('#ev-times', f).hidden = x.target.checked));
+    },
+    onSubmit(f, err) {
+      const d = {
+        title: f.etitle.value.trim(), type: f.querySelector('[name=type]:checked')?.value || 'other', date: f.date.value,
+        allDay: f.allDay.checked, startTime: f.startTime.value, endTime: f.endTime.value, location: f.location.value.trim(), note: f.note.value.trim(),
+        reminders: $$('[name=rem]:checked', f).map(c => +c.value).sort((a, b) => b - a),
+      };
+      if (!d.title) return err('請輸入標題'), false;
+      if (!d.date) return err('請選日期'), false;
+      if (!d.allDay && !d.startTime) return err('請填開始時間，或勾選「整天」'), false;
+      if (!d.allDay && d.endTime && d.endTime < d.startTime) return err('結束時間比開始時間早'), false;
+      if (d.allDay) { d.startTime = ''; d.endTime = ''; }
+      d.startAt = at(d.date, d.allDay ? '' : d.startTime).getTime();
+      const id = ev?.id || BE.newId('events');
+      BE.save('events', id, d).catch(fail);
+      BE.replaceReminders(`events/${id}`, eventReminders(d)).catch(fail);
+      S.sel = parseYmd(d.date);
+      toast(ev ? '已更新行程' : `已新增，${d.reminders.length ? '會依設定提醒你' : '沒有設定提醒'}`);
+    },
+    onDelete: ev && (() => { BE.remove('events', ev.id).catch(fail); BE.replaceReminders(`events/${ev.id}`, []).catch(fail); toast('已刪除行程'); }),
+  });
+}
+
+// 課程
+function openCourse(c, preset = {}) {
+  const sl = slots();
+  const x = c || { name: '', day: +preset.day || 1, startSlot: preset.slot || sl[0].code, endSlot: preset.slot || sl[0].code, room: '', teacher: '', color: COLORS[S.courses.length % COLORS.length] };
+  const names = [...new Set(S.courses.map(k => k.name))];
+  const slotOpts = sel => sl.map(s => `<option value="${esc(s.code)}" ${s.code === sel ? 'selected' : ''}>第 ${esc(s.code)} 節（${s.start}–${s.end}）</option>`).join('');
+  openModal({
+    title: c ? '編輯課程' : '新增課程',
+    body: `<label class="field"><span>課名</span><input id="co-name" name="cname" list="co-names" required value="${esc(x.name)}" placeholder="例如：深度學習"></label>
+      <datalist id="co-names">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <div class="three"><label class="field"><span>星期</span><select id="co-day" name="day">${[1, 2, 3, 4, 5, 6, 7].map(d => `<option value="${d}" ${x.day === d ? 'selected' : ''}>星期${DOW_LABEL[d]}</option>`).join('')}</select></label>
+        <label class="field"><span>從</span><select id="co-s" name="startSlot">${slotOpts(x.startSlot)}</select></label>
+        <label class="field"><span>到</span><select id="co-e" name="endSlot">${slotOpts(x.endSlot)}</select></label></div>
+      <div class="two"><label class="field"><span>教室</span><input id="co-room" name="room" value="${esc(x.room)}"></label>
+        <label class="field"><span>老師</span><input id="co-teacher" name="teacher" value="${esc(x.teacher)}"></label></div>
+      <fieldset><legend>顏色</legend><div class="choices colors">${COLORS.map(k => `<label class="choice"><input type="radio" name="color" value="${k}" ${x.color === k ? 'checked' : ''} aria-label="顏色 ${k}"><span style="--cc:var(--${k})"></span></label>`).join('')}</div></fieldset>`,
+    onMount(f) {
+      f.cname.addEventListener('change', () => {
+        const prev = S.courses.find(k => k.name === f.cname.value.trim());
+        if (!prev) return;
+        if (!f.room.value) f.room.value = prev.room || '';
+        if (!f.teacher.value) f.teacher.value = prev.teacher || '';
+        const r = f.querySelector(`[name=color][value=${prev.color}]`); if (r) r.checked = true;
+      });
+      f.startSlot.addEventListener('change', () => { if (slotIdx(f.endSlot.value) < slotIdx(f.startSlot.value)) f.endSlot.value = f.startSlot.value; });
+    },
+    onSubmit(f, err) {
+      const d = { name: f.cname.value.trim(), day: +f.day.value, startSlot: f.startSlot.value, endSlot: f.endSlot.value,
+        room: f.room.value.trim(), teacher: f.teacher.value.trim(), color: f.querySelector('[name=color]:checked')?.value || 'c1' };
+      if (!d.name) return err('請輸入課名'), false;
+      const a = slotIdx(d.startSlot), b = slotIdx(d.endSlot);
+      if (b < a) return err('結束節次不能比開始節次早'), false;
+      const clash = S.courses.find(k => k.id !== c?.id && k.day === d.day && !(slotIdx(k.endSlot) < a || slotIdx(k.startSlot) > b));
+      if (clash) return err(`和「${clash.name}」的時間重疊了`), false;
+      BE.save('courses', c?.id || BE.newId('courses'), d).catch(fail);
+      toast(c ? '已更新課程' : '已加入課表');
+    },
+    onDelete: c && (() => { BE.remove('courses', c.id).catch(fail); toast('已從課表移除'); }),
+  });
+}
+
+// 目標（排進度）
+function stepRow(s = { title: '', due: '', done: false }) {
+  return `<div class="step-row"><input type="checkbox" class="st-done" ${s.done ? 'checked' : ''} aria-label="已完成">
+    <input class="st-title" value="${esc(s.title)}" placeholder="步驟，例如：讀完 5 篇論文" aria-label="步驟名稱">
+    <input type="date" class="st-due" value="${s.due || ''}" aria-label="預定完成日">
+    <button type="button" class="icon-btn st-del" aria-label="移除這個步驟">✕</button></div>`;
+}
+function openGoal(g) {
+  const x = g || { title: '', deadline: '', note: '', steps: [] };
+  openModal({
+    title: g ? '編輯目標' : '新目標',
+    body: `<label class="field"><span>目標</span><input id="go-title" name="gtitle" required value="${esc(x.title)}" placeholder="例如：碩論第三章、期末專題、期中考準備"></label>
+      <label class="field"><span>截止日</span><input type="date" id="go-deadline" name="deadline" value="${x.deadline || ''}"></label>
+      <fieldset><legend>步驟（每個步驟當天早上 9 點提醒）</legend><div class="step-rows" id="go-steps">${(x.steps.length ? x.steps : [undefined, undefined]).map(s => stepRow(s)).join('')}</div>
+        <div class="actions"><button type="button" class="btn" id="go-add">＋ 加一個步驟</button>
+          <button type="button" class="btn" id="go-spread">依截止日平均排日期</button></div>
+        <p class="hint">「平均排日期」會把未完成步驟的日期，從明天到截止日平均分配（會覆蓋原本的日期）。</p></fieldset>
+      <label class="field"><span>備註</span><textarea id="go-note" name="note">${esc(x.note)}</textarea></label>`,
+    onMount(f) {
+      const box = $('#go-steps', f);
+      box.addEventListener('click', e => { if (e.target.closest('.st-del')) e.target.closest('.step-row').remove(); });
+      $('#go-add', f).onclick = () => { box.insertAdjacentHTML('beforeend', stepRow()); $$('.st-title', box).at(-1).focus(); };
+      $('#go-spread', f).onclick = () => {
+        const err = $('#m-err', dlg);
+        if (!f.deadline.value) { err.textContent = '先設定截止日，才能平均排日期'; err.hidden = false; return; }
+        const rows = $$('.step-row', box).filter(r => !$('.st-done', r).checked && $('.st-title', r).value.trim());
+        const span = dayDiff(today0(), parseYmd(f.deadline.value));
+        if (span < 1) { err.textContent = '截止日要在明天或之後'; err.hidden = false; return; }
+        rows.forEach((r, i) => { $('.st-due', r).value = ymd(addDays(today0(), Math.max(1, Math.round((i + 1) * span / rows.length)))); });
+        err.hidden = true; toast(`已把 ${rows.length} 個步驟排到截止日前`);
+      };
+    },
+    onSubmit(f, err) {
+      const steps = $$('.step-row', f).map(r => ({ title: $('.st-title', r).value.trim(), due: $('.st-due', r).value, done: $('.st-done', r).checked })).filter(s => s.title);
+      const d = { title: f.gtitle.value.trim(), deadline: f.deadline.value, note: f.note.value.trim(), steps };
+      if (!d.title) return err('請輸入目標名稱'), false;
+      const id = g?.id || BE.newId('goals');
+      BE.save('goals', id, d).catch(fail);
+      BE.replaceReminders(`goals/${id}`, goalReminders(d)).catch(fail);
+      toast(g ? '已更新目標' : '已建立目標');
+    },
+    onDelete: g && (() => { BE.remove('goals', g.id).catch(fail); BE.replaceReminders(`goals/${g.id}`, []).catch(fail); toast('已刪除目標'); }),
+  });
+}
+function toggleStep(id, i, done) {
+  const g = S.goals.find(x => x.id === id); if (!g) return;
+  const steps = g.steps.map((s, k) => k === i ? { ...s, done } : s);
+  const { id: _, ...rest } = g, d = { ...rest, steps };
+  BE.save('goals', id, d).catch(fail);
+  BE.replaceReminders(`goals/${id}`, goalReminders(d)).catch(fail);
+  if (done && steps.every(s => s.done)) toast(`「${g.title}」全部完成了`);
+}
+
+// ---------- 推播 ----------
+async function swReg() {
+  if (!('serviceWorker' in navigator)) return null;
+  return navigator.serviceWorker.register('firebase-messaging-sw.js');
+}
+async function showLocalNotification(title, body) {
+  try {
+    if (Notification.permission !== 'granted') return toast(`${title}：${body}`);
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) reg.showNotification(title, { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
+    else new Notification(title, { body, icon: 'icons/icon-192.png' });
+  } catch { toast(`${title}：${body}`); }
+}
+async function enablePush({ silent = false } = {}) {
+  try {
+    if (isIOS && !isStandalone) { if (!silent) toast('先用 Safari「分享 → 加入主畫面」，再從主畫面開啟'); return; }
+    if (!('Notification' in window)) { if (!silent) toast('這個瀏覽器不支援通知'); return; }
+    const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (perm !== 'granted') { if (!silent) toast('沒有取得通知權限'); render(); return; }
+    if (BE.mode === 'trial') { if (!silent) toast('已允許通知。試用模式只會在 app 開著時提醒'); render(); return; }
+    const M = await import(FB + 'firebase-messaging.js');
+    if (!(await M.isSupported())) { if (!silent) toast('這個瀏覽器不支援推播'); return; }
+    const reg = await swReg(); await navigator.serviceWorker.ready;
+    const messaging = M.getMessaging(BE.app);
+    const token = await M.getToken(messaging, { vapidKey: self.VAPID_KEY, serviceWorkerRegistration: reg });
+    if (!token) throw new Error('沒有拿到推播 token');
+    await BE.saveToken(token);
+    M.onMessage(messaging, p => {
+      const n = p.notification || {};
+      showLocalNotification(n.title || '研途手帳', n.body || '');
+    });
+    S.push = 'on'; render();
+    if (!silent) toast('推播已開啟');
+  } catch (e) { console.error(e); if (!silent) toast('開啟推播失敗：' + e.message); }
+}
+
+// ---------- 事件委派 ----------
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || el.type === 'checkbox') return;
+  const { act, id } = el.dataset;
+  switch (act) {
+    case 'signin': BE.signIn().catch(err => toast('登入失敗：' + err.message)); break;
+    case 'signout': BE.signOut(); break;
+    case 'new-event': openEvent(null, el.dataset.date); break;
+    case 'edit-event': openEvent(S.events.find(x => x.id === id)); break;
+    case 'new-course': openCourse(null, { day: el.dataset.day, slot: el.dataset.slot }); break;
+    case 'edit-course': openCourse(S.courses.find(x => x.id === id)); break;
+    case 'new-goal': openGoal(null); break;
+    case 'edit-goal': openGoal(S.goals.find(x => x.id === id)); break;
+    case 'cal-pick': S.sel = parseYmd(el.dataset.date); if (S.sel.getMonth() !== S.cursor.getMonth()) S.cursor = new Date(S.sel); render(); break;
+    case 'cal-prev': case 'cal-next': {
+      const dir = act === 'cal-prev' ? -1 : 1;
+      S.cursor = S.calMode === 'month' ? new Date(S.cursor.getFullYear(), S.cursor.getMonth() + dir, 1) : addDays(S.cursor, 7 * dir);
+      render(); break;
+    }
+    case 'cal-today': S.cursor = today0(); S.sel = today0(); render(); break;
+    case 'cal-mode': S.calMode = el.dataset.mode; S.cursor = new Date(S.sel); render(); break;
+    case 'push-enable': enablePush(); break;
+    case 'push-test-local': showLocalNotification('研途手帳測試', '看到這則就代表這台裝置可以跳通知'); break;
+    case 'push-test-remote':
+      BE.replaceReminders('test', [{ fireAt: Date.now(), eventAt: Date.now() + 3600000, title: '研途手帳測試推播', body: '這則是從排程送出的，代表推播整條路都通了' }])
+        .then(() => toast('已排好，下一次排程檢查（15 分鐘內）會送到所有開啟通知的裝置')).catch(fail);
+      break;
+    case 'save-semester': {
+      const s = $('#set-sem-s').value, en = $('#set-sem-e').value;
+      if (s && en && en < s) { toast('學期結束日比開學日早'); break; }
+      BE.saveProfile({ ...S.profile, semesterStart: s, semesterEnd: en, showWeekend: $('#set-weekend').checked }).catch(fail); toast('已儲存學期設定'); break;
+    }
+    case 'slots-save': {
+      const next = slots().map((s, i) => ({ code: s.code, start: $('#slot-s-' + i).value, end: $('#slot-e-' + i).value }));
+      const bad = next.find((s, i) => !s.start || !s.end || s.end <= s.start || (i && s.start < next[i - 1].end));
+      if (bad) { toast(`第 ${bad.code} 節的時間不對，請檢查開始、結束和前一節的順序`); break; }
+      BE.saveProfile({ ...S.profile, slots: next }).catch(fail); toast('已儲存節次時間'); break;
+    }
+    case 'slots-reset': BE.saveProfile({ ...S.profile, slots: NTHU_SLOTS }).catch(fail); toast('已恢復清大節次時間'); break;
+    case 'trial-clear':
+      if (!el.dataset.armed) { el.dataset.armed = '1'; el.textContent = '再按一次確定清空'; break; }
+      BE.clearAll(); toast('已清空，可以開始填自己的資料'); break;
+  }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.act === 'toggle-step') toggleStep(el.dataset.id, +el.dataset.i, el.checked);
+  if (el.id === 'set-classrem' || el.id === 'set-classlead') {
+    const on = $('#set-classrem').checked, lead = +$('#set-classlead').value;
+    BE.saveProfile({ ...S.profile, classReminder: on, classLead: lead }).catch(fail);
+    toast(on ? `每堂課前 ${lead} 分鐘提醒` : '已關閉上課提醒');
+    if (on && S.push !== 'on' && BE.mode === 'cloud') enablePush();
+  }
+});
+
+// ---------- 啟動 ----------
+function attach() {
+  S.ready = false;
+  const pending = new Set(['events', 'courses', 'goals', 'profile']);
+  const done = k => { pending.delete(k); if (!pending.size) S.ready = true; render(); };
+  ['events', 'courses', 'goals'].forEach(col => BE.watch(col, arr => { S[col] = arr; done(col); }));
+  BE.watch('profile', p => { S.profile = { ...DEFAULT_PROFILE, ...p }; done('profile'); });
+  if (BE.mode === 'cloud' && 'Notification' in window && Notification.permission === 'granted') enablePush({ silent: true });
+}
+async function boot() {
+  route();
+  try { BE = TRIAL ? makeLocal() : await makeFirebase(); }
+  catch (e) {
+    console.error(e);
+    root.innerHTML = `<div class="login"><div class="login-card"><h1>研途手帳</h1><p>連不上 Firebase：${esc(e.message)}。請確認網路，或檢查 firebase-config.js 的設定值。</p></div></div>`;
+    return;
+  }
+  BE.onUser(u => { S.user = u; S.ready = false; if (u) attach(); else render(); });
+  swReg()?.catch(() => { });
+  // 跨過午夜時更新「今天」
+  let lastDay = ymd(new Date());
+  setInterval(() => { const k = ymd(new Date()); if (k !== lastDay) { lastDay = k; S.cursor = today0(); S.sel = today0(); } if (S.user && !dlg.open && (S.view === 'today' || S.view === 'calendar')) render(); }, 60000);
+}
+boot();
+</script>
+</body>
+</html>
